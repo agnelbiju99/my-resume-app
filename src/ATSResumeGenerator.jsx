@@ -342,7 +342,7 @@ function calcScore(data, prof) {
 
 const S = {
   app: { fontFamily: "'Segoe UI', system-ui, sans-serif", fontSize: 14, color: "#1a1a2e", minHeight: "100vh", background: "#f0f2f5", display: "flex", flexDirection: "column" },
-  topbar: { background: "#0f1629", color: "#fff", padding: "10px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" },
+  topbar: { background: "#0f1629", color: "#fff", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, flexWrap: "wrap" },
   appTitle: { fontWeight: 600, fontSize: 15, letterSpacing: ".2px", display: "flex", alignItems: "center", gap: 7 },
   modeTabs: { display: "flex", borderRadius: 8, overflow: "hidden", border: "1px solid #2d3a5a" },
   modeTab: (active) => ({ padding: "5px 14px", fontSize: 12, cursor: "pointer", background: active ? "#2563eb" : "transparent", color: active ? "#fff" : "#8899bb", border: "none", fontFamily: "inherit", transition: "all .15s" }),
@@ -352,6 +352,7 @@ const S = {
   btnWord: { background: "#1d6f42", color: "#fff", border: "1px solid #1d6f42" },
   btnSm: { padding: "4px 9px", fontSize: 11 },
   main: { display: "flex", flex: 1, overflow: "hidden" },
+  mobileOnly: { display: "none" },
   editorCol: { flex: 1, minWidth: 0, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 },
   previewCol: { width: 390, minWidth: 320, background: "#e8ebf0", borderLeft: "1px solid #d0d5de", overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 },
   card: { background: "#fff", border: "1px solid #e5e7ef", borderRadius: 12, padding: 14 },
@@ -784,15 +785,15 @@ ${allSkills.length ? `<h2>Skills</h2><div class="skills">${allSkills.join(" | ")
     if (step === "personal") return (
       <div style={S.card}>
         <div style={S.cardTitle}>👤 Personal Info</div>
-        <div style={S.formRow(2)}>
+        <div style={S.formRow(2)} className="form-row-2">
           <div style={S.formGroup}><label style={S.label}>Full Name</label><input style={S.input} value={data.name} onChange={e => upd("name", e.target.value)} placeholder="Jane Smith" /></div>
           <div style={S.formGroup}><label style={S.label}>Email</label><input style={S.input} type="email" value={data.email} onChange={e => upd("email", e.target.value)} placeholder="jane@email.com" /></div>
         </div>
-        <div style={S.formRow(2)}>
+        <div style={S.formRow(2)} className="form-row-2">
           <div style={S.formGroup}><label style={S.label}>Phone</label><input style={S.input} value={data.phone} onChange={e => upd("phone", e.target.value)} placeholder="+1 (555) 000-0000" /></div>
           <div style={S.formGroup}><label style={S.label}>Location</label><input style={S.input} value={data.location} onChange={e => upd("location", e.target.value)} placeholder="City, State" /></div>
         </div>
-        <div style={S.formRow(2)}>
+        <div style={S.formRow(2)} className="form-row-2">
           <div style={S.formGroup}><label style={S.label}>LinkedIn</label><input style={S.input} value={data.linkedin} onChange={e => upd("linkedin", e.target.value)} placeholder="linkedin.com/in/jane" /></div>
           <div style={S.formGroup}><label style={S.label}>GitHub</label><input style={S.input} value={data.website} onChange={e => upd("website", e.target.value)} placeholder="github.com/username" /></div>
         </div>
@@ -835,11 +836,11 @@ ${allSkills.length ? `<h2>Skills</h2><div class="skills">${allSkills.join(" | ")
               <span style={{ fontSize: 12, fontWeight: 600 }}>{e.title || "Experience " + (idx + 1)}</span>
               {data.experience.length > 1 && <button style={{ ...S.btn, ...S.btnSm, borderColor: "#dc2626", color: "#dc2626" }} onClick={() => removeExp(e.id)}>🗑</button>}
             </div>
-            <div style={S.formRow(2)}>
+            <div style={S.formRow(2)} className="form-row-2">
               <div style={S.formGroup}><label style={S.label}>Job Title</label><input style={S.input} value={e.title} onChange={ev => updExp(e.id, "title", ev.target.value)} placeholder="Software Engineer" /></div>
               <div style={S.formGroup}><label style={S.label}>Company</label><input style={S.input} value={e.company} onChange={ev => updExp(e.id, "company", ev.target.value)} placeholder="Acme Corp" /></div>
             </div>
-            <div style={S.formRow(3)}>
+            <div style={S.formRow(3)} className="form-row-3">
               <div style={S.formGroup}><label style={S.label}>Location</label><input style={S.input} value={e.location} onChange={ev => updExp(e.id, "location", ev.target.value)} placeholder="City, ST" /></div>
               <div style={S.formGroup}><label style={S.label}>Start Date</label><input style={S.input} value={e.startDate} onChange={ev => updExp(e.id, "startDate", ev.target.value)} placeholder="Jan 2022" /></div>
               <div style={S.formGroup}><label style={S.label}>End Date</label><input style={S.input} value={e.endDate} onChange={ev => updExp(e.id, "endDate", ev.target.value)} placeholder="Present" /></div>
@@ -871,11 +872,11 @@ ${allSkills.length ? `<h2>Skills</h2><div class="skills">${allSkills.join(" | ")
               <span style={{ fontSize: 12, fontWeight: 600 }}>{e.degree || "Education " + (idx + 1)}</span>
               {data.education.length > 1 && <button style={{ ...S.btn, ...S.btnSm, borderColor: "#dc2626", color: "#dc2626" }} onClick={() => removeEdu(e.id)}>🗑</button>}
             </div>
-            <div style={S.formRow(2)}>
+            <div style={S.formRow(2)} className="form-row-2">
               <div style={S.formGroup}><label style={S.label}>Degree</label><input style={S.input} value={e.degree} onChange={ev => updEdu(e.id, "degree", ev.target.value)} placeholder="B.Sc. Computer Science" /></div>
               <div style={S.formGroup}><label style={S.label}>Institution</label><input style={S.input} value={e.institution} onChange={ev => updEdu(e.id, "institution", ev.target.value)} placeholder="MIT" /></div>
             </div>
-            <div style={S.formRow(3)}>
+            <div style={S.formRow(3)} className="form-row-3">
               <div style={S.formGroup}><label style={S.label}>Year</label><input style={S.input} value={e.year} onChange={ev => updEdu(e.id, "year", ev.target.value)} placeholder="2020" /></div>
               <div style={S.formGroup}><label style={S.label}>{/b\.?tech|b\.?e/i.test(e.degree) ? "CGPA (optional)" : "Percentage (optional)"}</label><input style={S.input} value={e.gpa} onChange={ev => updEdu(e.id, "gpa", ev.target.value)} placeholder={/b\.?tech|b\.?e/i.test(e.degree) ? "8.5" : "85%"} /></div>
               <div style={S.formGroup}><label style={S.label}>Honors (optional)</label><input style={S.input} value={e.honors} onChange={ev => updEdu(e.id, "honors", ev.target.value)} placeholder="Cum Laude" /></div>
@@ -960,16 +961,29 @@ ${allSkills.length ? `<h2>Skills</h2><div class="skills">${allSkills.join(" | ")
         </div>
         <div style={S.btnGroup}>
           <button style={{ ...S.btn, ...S.btnWord }} onClick={handleWordExport} disabled={wordExporting}>
-            {wordExporting ? "Exporting..." : "⬇ Download .docx"}
+            {wordExporting ? "Exporting..." : "⬇ .docx"}
           </button>
           <button style={S.btn} onClick={downloadHTML}>⬇ HTML</button>
-          <button style={{ ...S.btn, ...S.btnPrimary }} onClick={() => printResume()}>🖨 Print PDF</button>
+          <button style={{ ...S.btn, ...S.btnPrimary }} onClick={() => printResume()}>🖨 PDF</button>
+          <button id="mobile-preview-btn" style={{ ...S.btn, display: "none", background: "#7c3aed", color: "#fff", border: "1px solid #7c3aed" }}
+            onClick={() => {
+              const pc = document.getElementById("preview-col");
+              const mb = document.getElementById("mobile-preview-btn");
+              if (pc.style.display === "flex") {
+                pc.style.display = "none";
+                mb.textContent = "👁 Preview";
+              } else {
+                pc.style.display = "flex";
+                pc.style.flexDirection = "column";
+                mb.textContent = "✏️ Edit";
+              }
+            }}>👁 Preview</button>
         </div>
       </div>
 
-      <div style={S.main}>
+      <div style={S.main} id="main-area">
         {/* Editor Column */}
-        <div style={S.editorCol}>
+        <div style={S.editorCol} id="editor-col">
           {mode === "B" && (
             <div style={S.card}>
               <div style={S.cardTitle}>📋 Paste Your Resume</div>
@@ -1017,7 +1031,7 @@ ${allSkills.length ? `<h2>Skills</h2><div class="skills">${allSkills.join(" | ")
         </div>
 
         {/* Preview Column */}
-        <div style={S.previewCol}>
+        <div style={S.previewCol} id="preview-col">
           {/* ATS Score */}
           <div style={S.card}>
             <div style={S.cardTitle}>📊 ATS Score</div>
@@ -1093,15 +1107,33 @@ ${allSkills.length ? `<h2>Skills</h2><div class="skills">${allSkills.join(" | ")
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
+        * { box-sizing: border-box; }
+
+        /* ── MOBILE ── */
+        @media (max-width: 768px) {
+          #main-area { flex-direction: column !important; }
+          #preview-col { display: none !important; }
+          #editor-col { padding: 10px !important; }
+          #mobile-preview-btn { display: flex !important; }
+          .topbar-buttons span { display: none; }
+          .prof-grid { grid-template-columns: 1fr 1fr !important; }
+          .form-row-2 { grid-template-columns: 1fr !important; }
+          .form-row-3 { grid-template-columns: 1fr 1fr !important; }
+          .step-tabs { flex-wrap: wrap !important; gap: 4px !important; }
+        }
+
+        @media (max-width: 480px) {
+          .form-row-3 { grid-template-columns: 1fr !important; }
+          .topbar-title { font-size: 13px !important; }
+        }
+
         @media print {
           * { visibility: hidden; }
           #print-resume, #print-resume * { visibility: visible; }
           #print-resume {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             padding: 20mm;
             box-sizing: border-box;
             background: white;
