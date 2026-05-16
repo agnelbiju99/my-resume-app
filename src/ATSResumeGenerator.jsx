@@ -25,7 +25,7 @@
  * - Profession presets with keyword chips and action verbs
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Document, Packer, Paragraph, TextRun, AlignmentType, LevelFormat, BorderStyle } from "docx";
 import { saveAs } from "file-saver";
 
@@ -84,7 +84,7 @@ const emptyData = () => ({
   name: "", email: "", phone: "", location: "", linkedin: "", website: "",
   summary: "",
   experience: [{ id: 1, title: "", company: "", location: "", startDate: "", endDate: "", bullets: [""] }],
-  education: [{ id: 1, degree: "", institution: "", year: "", gpa: "", honors: "" }],
+  education: [{ id: 1, degree: "", institution: "", year: "", gpa: "", honors: "", university: "", mbbsClass: "" }],
   skills: { technical: [], soft: [], tools: [] },
   skillInput: { technical: "", soft: "", tools: "" },
   certifications: "",
@@ -173,7 +173,7 @@ async function exportToWord(data) {
         ],
         spacing: { before: 100, after: 40 },
       }));
-      const isBtech = /b\.?tech|b\.?e\b/i.test(e.degree); const sub = [e.institution, e.gpa ? (isBtech ? "CGPA: " : "Percentage: ") + e.gpa : "", e.honors].filter(Boolean).join("  |  ");
+      const isBtech = /b\.?tech|b\.?e\b/i.test(e.degree); const isMbbs = /mbbs/i.test(e.degree); const sub = [e.institution, e.university||"", e.gpa ? (isBtech ? "CGPA: " : "Percentage: ") + e.gpa : "", e.mbbsClass ? "Class: "+e.mbbsClass : "", e.honors].filter(Boolean).join("  |  ");
       if (sub) {
         children.push(new Paragraph({
           children: [new TextRun({ text: sub, size: 18, font: "Times New Roman", color: "555555" })],
@@ -448,7 +448,7 @@ function ResumePreviewModern({ data }) {
         {data.education.filter(e => e.degree).map((e, i) => (
           <div key={i} style={{ marginBottom: 4 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 10 }}><span>{e.degree}</span><span style={{ fontWeight: 400, color: "#555" }}>{e.year}</span></div>
-            <div style={{ fontSize: 9, color: "#555" }}>{e.institution}{e.gpa ? (/b\.?tech|b\.?e\b/i.test(e.degree) ? " | CGPA: " : " | Percentage: ") + e.gpa : ""}</div>
+            <div style={{ fontSize: 9, color: "#555" }}>{[e.institution, e.university, e.gpa ? (/b\.?tech|b\.?e\b/i.test(e.degree) ? "CGPA: " : "Percentage: ") + e.gpa : "", /mbbs/i.test(e.degree) && e.mbbsClass ? "Class: "+e.mbbsClass : ""].filter(Boolean).join("  |  ")}</div>
           </div>
         ))}
       </>}
@@ -532,18 +532,50 @@ function Toggle({ on, onToggle, label }) {
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function ATSResumeGenerator() {
+  // ── AUTOSAVE: Load from localStorage on first render ──────────────
+  const loadSaved = () => {
+    try {
+      const saved = localStorage.getItem("ats_resume_data");
+      return saved ? JSON.parse(saved) : emptyData();
+    } catch { return emptyData(); }
+  };
+  const loadSavedMeta = (key, fallback) => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : fallback;
+    } catch { return fallback; }
+  };
+
   const [mode, setMode] = useState("A");
-  const [prof, setProf] = useState("tech");
-  const [template, setTemplate] = useState("classic");
+  const [prof, setProf] = useState(() => loadSavedMeta("ats_prof", "tech"));
+  const [template, setTemplate] = useState(() => loadSavedMeta("ats_template", "classic"));
   const [step, setStep] = useState("personal");
   const [completedSteps, setCompletedSteps] = useState(new Set());
-  const [data, setData] = useState(emptyData());
-  const [versions, setVersions] = useState([]);
+  const [data, setData] = useState(loadSaved);
+  const [versions, setVersions] = useState(() => loadSavedMeta("ats_versions", []));
   const [pasteText, setPasteText] = useState("");
   const [parsing, setParsing] = useState(false);
   const [jdText, setJdText] = useState("");
   const [jdResults, setJdResults] = useState(null);
   const [wordExporting, setWordExporting] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("saved"); // "saved" | "saving" | "unsaved"
+  const saveTimer = useRef(null);
+
+  // ── AUTOSAVE: Save to localStorage whenever data changes ───────────
+  useEffect(() => {
+    setSaveStatus("unsaved");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem("ats_resume_data", JSON.stringify(data));
+        localStorage.setItem("ats_prof", JSON.stringify(prof));
+        localStorage.setItem("ats_template", JSON.stringify(template));
+        localStorage.setItem("ats_versions", JSON.stringify(versions));
+        setSaveStatus("saved");
+      } catch { setSaveStatus("unsaved"); }
+    }, 1000); // debounce 1 second
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [data, prof, template, versions]);
 
   const upd = useCallback((key, val) => setData(d => ({ ...d, [key]: val })), []);
 
@@ -563,7 +595,7 @@ export default function ATSResumeGenerator() {
   const removeExp = (id) => setData(d => ({ ...d, experience: d.experience.filter(e => e.id !== id) }));
   const addBullet = (id) => setData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: [...e.bullets, ""] } : e) }));
   const removeBullet = (id, bi) => setData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: e.bullets.filter((_, i) => i !== bi) } : e) }));
-  const addEdu = () => setData(d => ({ ...d, education: [...d.education, { id: Date.now(), degree: "", institution: "", year: "", gpa: "", honors: "" }] }));
+  const addEdu = () => setData(d => ({ ...d, education: [...d.education, { id: Date.now(), degree: "", institution: "", year: "", gpa: "", honors: "", university: "", mbbsClass: "" }] }));
   const removeEdu = (id) => setData(d => ({ ...d, education: d.education.filter(e => e.id !== id) }));
 
   const addSkill = (cat) => {
@@ -581,6 +613,21 @@ export default function ATSResumeGenerator() {
   const goStep = (id) => { setCompletedSteps(s => new Set([...s, step])); setStep(id); };
 
   const toggleOptional = (id) => setData(d => ({ ...d, optionals: { ...d.optionals, [id]: !d.optionals[id] } }));
+
+  const clearAllData = () => {
+    if (window.confirm("Clear all saved data and start fresh?")) {
+      localStorage.removeItem("ats_resume_data");
+      localStorage.removeItem("ats_prof");
+      localStorage.removeItem("ats_template");
+      localStorage.removeItem("ats_versions");
+      setData(emptyData());
+      setProf("tech");
+      setTemplate("classic");
+      setVersions([]);
+      setStep("personal");
+      setSaveStatus("saved");
+    }
+  };
 
   const saveVersion = () => {
     const name = window.prompt("Version name (e.g. 'Google - SWE'):");
@@ -606,7 +653,7 @@ export default function ATSResumeGenerator() {
         body: JSON.stringify({
           model: "claude-sonnet-4-5",
           max_tokens: 1000,
-          system: 'You are a resume parser. Extract info and return ONLY valid JSON (no markdown, no backticks) with: {"name":"","email":"","phone":"","location":"","linkedin":"","website":"","summary":"","experience":[{"title":"","company":"","location":"","startDate":"","endDate":"","bullets":[""]}],"education":[{"degree":"","institution":"","year":"","gpa":"","honors":""}],"skills":{"technical":[],"soft":[],"tools":[]},"certifications":""}',
+          system: 'You are a resume parser. Extract info and return ONLY valid JSON (no markdown, no backticks) with: {"name":"","email":"","phone":"","location":"","linkedin":"","website":"","summary":"","experience":[{"title":"","company":"","location":"","startDate":"","endDate":"","bullets":[""]}],"education":[{"degree":"","institution":"","year":"","gpa":"","honors":"","university":"","mbbsClass":""}],"skills":{"technical":[],"soft":[],"tools":[]},"certifications":""}',
           messages: [{ role: "user", content: "Parse this resume:\n\n" + pasteText }],
         }),
       });
@@ -619,7 +666,7 @@ export default function ATSResumeGenerator() {
         location: parsed.location || "", linkedin: parsed.linkedin || "", website: parsed.website || "",
         summary: parsed.summary || "", certifications: parsed.certifications || "",
         experience: (parsed.experience || []).map((e, i) => ({ id: i + 1, ...e, bullets: e.bullets || [""] })),
-        education: (parsed.education || []).map((e, i) => ({ id: i + 1, ...e })),
+        education: (parsed.education || []).map((e, i) => ({ id: i + 1, university: "", mbbsClass: "", ...e })),
         skills: { technical: parsed.skills?.technical || [], soft: parsed.skills?.soft || [], tools: parsed.skills?.tools || [] },
       }));
       setMode("A");
@@ -703,7 +750,7 @@ export default function ATSResumeGenerator() {
           ${data.summary ? `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;color:#1e40af;border-left:3px solid #1e40af;padding-left:8px;margin-bottom:6px">Professional Summary</div><p style="font-size:10pt;margin-bottom:14px">${data.summary}</p>` : ""}
           ${data.experience.some(e=>e.title) ? `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;color:#1e40af;border-left:3px solid #1e40af;padding-left:8px;margin-bottom:6px">Work Experience</div>${data.experience.filter(e=>e.title).map(e=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:10pt"><span>${e.title}${e.company?", "+e.company:""}</span><span style="font-weight:400;color:#555">${[e.startDate,e.endDate].filter(Boolean).join(" – ")}</span></div>${e.bullets.filter(b=>b).map(b=>`${b.split("\n").filter(l=>l.trim()).map(l=>`<div style="padding-left:12px;font-size:9.5pt;margin-bottom:2px;position:relative"><span style="position:absolute;left:0">–</span>${l.replace(/^[-•]\s*/,"")}</div>`).join("")}`).join("")}</div>`).join("")}` : ""}
           ${allSkills.length ? `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;color:#1e40af;border-left:3px solid #1e40af;padding-left:8px;margin-bottom:6px;margin-top:14px">Skills</div><div style="font-size:9.5pt;display:flex;flex-wrap:wrap;gap:4px">${allSkills.map(s=>`<span style="background:#eff6ff;color:#1e40af;padding:2px 7px;border-radius:3px">${s}</span>`).join(" ")}</div>` : ""}
-          ${data.education.some(e=>e.degree) ? `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;color:#1e40af;border-left:3px solid #1e40af;padding-left:8px;margin-bottom:6px;margin-top:14px">Education</div>${data.education.filter(e=>e.degree).map(e=>`<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:10pt"><span>${e.degree}</span><span style="font-weight:400;color:#555">${e.year}</span></div><div style="font-size:9.5pt;color:#555">${e.institution}${e.gpa?" | "+getEduLabel(e.degree)+": "+e.gpa:""}</div></div>`).join("")}` : ""}
+          ${data.education.some(e=>e.degree) ? `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;color:#1e40af;border-left:3px solid #1e40af;padding-left:8px;margin-bottom:6px;margin-top:14px">Education</div>${data.education.filter(e=>e.degree).map(e=>`<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:10pt"><span>${e.degree}</span><span style="font-weight:400;color:#555">${e.year}</span></div><div style="font-size:9.5pt;color:#555">${[e.institution, e.university||"", e.gpa?getEduLabel(e.degree)+": "+e.gpa:"", /mbbs/i.test(e.degree)&&e.mbbsClass?"Class: "+e.mbbsClass:"", e.honors||""].filter(Boolean).join("  |  ")}</div></div>`).join("")}` : ""}
         </div>`;
     } else if (tmpl === "creative") {
       resumeHTML = `
@@ -721,7 +768,7 @@ export default function ATSResumeGenerator() {
           ${data.summary ? `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;color:#1e3a5f;border-bottom:2px solid #1e3a5f;padding-bottom:3px;margin-bottom:7px">Summary</div><p style="font-size:10pt;margin-bottom:14px">${data.summary}</p>` : ""}
           ${data.experience.some(e=>e.title) ? `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;color:#1e3a5f;border-bottom:2px solid #1e3a5f;padding-bottom:3px;margin-bottom:7px">Experience</div>${data.experience.filter(e=>e.title).map(e=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:10pt"><span>${e.title}${e.company?", "+e.company:""}</span><span style="font-weight:400;color:#555">${[e.startDate,e.endDate].filter(Boolean).join(" – ")}</span></div>${e.bullets.filter(b=>b).map(b=>`${b.split("\n").filter(l=>l.trim()).map(l=>`<div style="padding-left:12px;font-size:9.5pt;margin-bottom:2px;position:relative"><span style="position:absolute;left:0">–</span>${l.replace(/^[-•]\s*/,"")}</div>`).join("")}`).join("")}</div>`).join("")}` : ""}
           ${allSkills.length ? `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;color:#1e3a5f;border-bottom:2px solid #1e3a5f;padding-bottom:3px;margin-bottom:7px;margin-top:14px">Skills</div><div style="font-size:9.5pt;display:flex;flex-wrap:wrap;gap:4px">${allSkills.map(s=>`<span style="background:#dbeafe;color:#1e40af;padding:2px 7px;border-radius:3px">${s}</span>`).join(" ")}</div>` : ""}
-          ${data.education.some(e=>e.degree) ? `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;color:#1e3a5f;border-bottom:2px solid #1e3a5f;padding-bottom:3px;margin-bottom:7px;margin-top:14px">Education</div>${data.education.filter(e=>e.degree).map(e=>`<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:10pt"><span>${e.degree}</span><span style="font-weight:400;color:#555">${e.year}</span></div><div style="font-size:9.5pt;color:#555">${e.institution}${e.gpa?" | "+getEduLabel(e.degree)+": "+e.gpa:""}</div></div>`).join("")}` : ""}
+          ${data.education.some(e=>e.degree) ? `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;color:#1e3a5f;border-bottom:2px solid #1e3a5f;padding-bottom:3px;margin-bottom:7px;margin-top:14px">Education</div>${data.education.filter(e=>e.degree).map(e=>`<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:10pt"><span>${e.degree}</span><span style="font-weight:400;color:#555">${e.year}</span></div><div style="font-size:9.5pt;color:#555">${[e.institution, e.university||"", e.gpa?getEduLabel(e.degree)+": "+e.gpa:"", /mbbs/i.test(e.degree)&&e.mbbsClass?"Class: "+e.mbbsClass:"", e.honors||""].filter(Boolean).join("  |  ")}</div></div>`).join("")}` : ""}
         </div>`;
     } else {
       // Classic and Executive
@@ -766,7 +813,7 @@ export default function ATSResumeGenerator() {
 <div class="contact">${[data.email, data.phone, data.location, data.linkedin, data.website].filter(Boolean).join(" | ")}</div>
 ${data.summary ? `<h2>Professional Summary</h2><p>${data.summary}</p>` : ""}
 ${data.experience.some(e => e.title) ? `<h2>Work Experience</h2>${data.experience.filter(e => e.title).map(e => `<div class="entry"><div class="entry-header"><span>${e.title}${e.company ? ", " + e.company : ""}</span><span style="font-weight:400">${[e.startDate, e.endDate].filter(Boolean).join(" – ")}</span></div>${e.location ? `<div class="entry-sub">${e.location}</div>` : ""}${e.bullets.filter(b => b).map(b => `<div class="bullet">${b.split("\n").filter(l=>l.trim()).map((l,li)=><div key={li} style={{paddingLeft:10,fontSize:9,marginBottom:1,position:"relative"}}><span style={{position:"absolute",left:0}}>–</span>{l.replace(/^[-•]\s*/,"")}</div>)}</div>`).join("")}</div>`).join("")}` : ""}
-${data.education.some(e => e.degree) ? `<h2>Education</h2>${data.education.filter(e => e.degree).map(e => `<div class="entry"><div class="entry-header"><span>${e.degree}</span><span style="font-weight:400">${e.year}</span></div><div class="entry-sub">${e.institution}${e.gpa ? (/b\.?tech|b\.?e\b/i.test(e.degree) ? " | CGPA: " : " | Percentage: ") + e.gpa : ""}</div></div>`).join("")}` : ""}
+${data.education.some(e => e.degree) ? `<h2>Education</h2>${data.education.filter(e => e.degree).map(e => `<div class="entry"><div class="entry-header"><span>${e.degree}</span><span style="font-weight:400">${e.year}</span></div><div class="entry-sub">${[e.institution, e.university||"", e.gpa?(/b\.?tech|b\.?e\b/i.test(e.degree)?"CGPA: ":"Percentage: ")+e.gpa:"", /mbbs/i.test(e.degree)&&e.mbbsClass?"Class: "+e.mbbsClass:""].filter(Boolean).join(" | ")}</div></div>`).join("")}` : ""}
 ${allSkills.length ? `<h2>Skills</h2><div class="skills">${allSkills.join(" | ")}</div>` : ""}
 </body></html>`;
     const blob = new Blob([html], { type: "text/html" });
@@ -878,8 +925,25 @@ ${allSkills.length ? `<h2>Skills</h2><div class="skills">${allSkills.join(" | ")
             </div>
             <div style={S.formRow(3)} className="form-row-3">
               <div style={S.formGroup}><label style={S.label}>Year</label><input style={S.input} value={e.year} onChange={ev => updEdu(e.id, "year", ev.target.value)} placeholder="2020" /></div>
-              <div style={S.formGroup}><label style={S.label}>{/b\.?tech|b\.?e/i.test(e.degree) ? "CGPA (optional)" : "Percentage (optional)"}</label><input style={S.input} value={e.gpa} onChange={ev => updEdu(e.id, "gpa", ev.target.value)} placeholder={/b\.?tech|b\.?e/i.test(e.degree) ? "8.5" : "85%"} /></div>
+              <div style={S.formGroup}><label style={S.label}>{/b\.?tech|b\.?e\b/i.test(e.degree) ? "CGPA (optional)" : "Percentage (optional)"}</label><input style={S.input} value={e.gpa} onChange={ev => updEdu(e.id, "gpa", ev.target.value)} placeholder={/b\.?tech|b\.?e\b/i.test(e.degree) ? "8.5" : "85%"} /></div>
               <div style={S.formGroup}><label style={S.label}>Honors (optional)</label><input style={S.input} value={e.honors} onChange={ev => updEdu(e.id, "honors", ev.target.value)} placeholder="Cum Laude" /></div>
+            </div>
+            <div style={S.formRow(2)} className="form-row-2">
+              <div style={S.formGroup}><label style={S.label}>University (optional)</label><input style={S.input} value={e.university||""} onChange={ev => updEdu(e.id, "university", ev.target.value)} placeholder="University of Kerala" /></div>
+              {/mbbs/i.test(e.degree) && (
+                <div style={S.formGroup}>
+                  <label style={S.label}>Class (Distinction / First Class)</label>
+                  <select style={S.input} value={e.mbbsClass||""} onChange={ev => updEdu(e.id, "mbbsClass", ev.target.value)}>
+                    <option value="">Select Class</option>
+                    <option value="Distinction">Distinction</option>
+                    <option value="First Class">First Class</option>
+                    <option value="Second Class">Second Class</option>
+                    <option value="Pass">Pass</option>
+                  </select>
+                </div>
+              )}
+            </div>
+            <div style={{display:"none"}}>
             </div>
           </div>
         ))}
@@ -953,13 +1017,26 @@ ${allSkills.length ? `<h2>Skills</h2><div class="skills">${allSkills.join(" | ")
       {/* Topbar */}
       <div style={S.topbar}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <div style={S.appTitle}>📄 ATS Resume Generator</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={S.appTitle}>📄 ATS Resume Generator</div>
+            <div style={{
+              fontSize: 10, padding: "2px 8px", borderRadius: 10,
+              background: saveStatus === "saved" ? "#dcfce7" : saveStatus === "saving" ? "#fef9c3" : "#fee2e2",
+              color: saveStatus === "saved" ? "#16a34a" : saveStatus === "saving" ? "#ca8a04" : "#dc2626",
+              fontWeight: 500, display: "flex", alignItems: "center", gap: 3
+            }}>
+              {saveStatus === "saved" ? "✓ Auto-saved" : saveStatus === "saving" ? "⏳ Saving..." : "● Unsaved"}
+            </div>
+          </div>
           <div style={S.modeTabs}>
             <button style={S.modeTab(mode === "A")} onClick={() => setMode("A")}>Form Builder</button>
             <button style={S.modeTab(mode === "B")} onClick={() => setMode("B")}>Paste & Parse</button>
           </div>
         </div>
         <div style={S.btnGroup}>
+          <button style={{ ...S.btn, fontSize: 11, borderColor: "#dc2626", color: "#dc2626" }} onClick={clearAllData} title="Clear all data">
+            🗑 Clear
+          </button>
           <button style={{ ...S.btn, ...S.btnWord }} onClick={handleWordExport} disabled={wordExporting}>
             {wordExporting ? "Exporting..." : "⬇ .docx"}
           </button>
